@@ -10,6 +10,8 @@ import {
   Menu, X
 } from "lucide-react";
 import "./App.css";
+import Customers from "./pages/Customers";
+
 
 const menuItems = [
   { name: "Dashboard", icon: LayoutDashboard },
@@ -92,11 +94,13 @@ function App() {
     <ProductStock />
   ) : activePage === "Transaksi" ? (
     <Transactions />
-  ) : activePage === "Pengaturan" ? (
-    <SettingsPage />
-  ) : (
-    <PlaceholderPage title={activePage} />
-  )}
+ ) : activePage === "Pengaturan" ? (
+  <SettingsPage />
+) : activePage === "Pelanggan" ? (
+  <Customers />
+) : (
+  <PlaceholderPage title={activePage} />
+)}
 </div>
       </main>
     </div>
