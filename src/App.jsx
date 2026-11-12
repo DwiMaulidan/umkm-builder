@@ -1,10 +1,11 @@
 import Dashboard from "./pages/Dashboard";
 import ProductStock from "./pages/ProductStock";
 import Transactions from "./pages/Transactions";
+import SettingsPage from "./pages/SettingsPage";
 import { useState } from "react";
 import {
   LayoutDashboard, ReceiptText, Package, Users, ChartColumn,
-  Workflow, Blocks, Plug, Settings, Search, Bell, ChevronDown,
+  Workflow, Blocks, Plug, Settings as SettingsIcon, Search, Bell, ChevronDown,
   Plus, AlertTriangle, TrendingUp, Wallet, Clock, ArrowUpRight,
   Menu, X
 } from "lucide-react";
@@ -19,7 +20,7 @@ const menuItems = [
   { name: "Workflow Builder", icon: Workflow, tag: "Utama" },
   { name: "Template", icon: Blocks },
   { name: "Integrasi", icon: Plug },
-  { name: "Pengaturan", icon: Settings },
+  { name: "Pengaturan", icon: SettingsIcon },
 ];
 
 function PlaceholderPage({ title }) {
@@ -85,16 +86,18 @@ function App() {
         </header>
 
       <div className="page-content">
-        {activePage === "Dashboard" ? (
-          <Dashboard />
-        ) : activePage === "Produk & Stok" ? (
-          <ProductStock />
-        ) : activePage === "Transaksi" ? (
-          <Transactions />
-        ) : (
-          <PlaceholderPage title={activePage} />
-        )}
-      </div>
+  {activePage === "Dashboard" ? (
+    <Dashboard />
+  ) : activePage === "Produk & Stok" ? (
+    <ProductStock />
+  ) : activePage === "Transaksi" ? (
+    <Transactions />
+  ) : activePage === "Pengaturan" ? (
+    <SettingsPage />
+  ) : (
+    <PlaceholderPage title={activePage} />
+  )}
+</div>
       </main>
     </div>
   );
