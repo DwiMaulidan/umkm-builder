@@ -1,0 +1,39 @@
+﻿    table_name     |  column_name   |          data_type          | is_nullable 
+-------------------+----------------+-----------------------------+-------------
+ business_members  | id             | bigint                      | NO
+ business_members  | user_id        | bigint                      | YES
+ business_members  | business_id    | bigint                      | YES
+ business_members  | role           | character varying           | YES
+ businesses        | id             | bigint                      | NO
+ businesses        | name           | character varying           | NO
+ businesses        | address        | text                        | YES
+ businesses        | phone          | character varying           | YES
+ businesses        | created_at     | timestamp without time zone | YES
+ products          | id             | bigint                      | NO
+ products          | business_id    | bigint                      | NO
+ products          | name           | character varying           | NO
+ products          | category       | character varying           | YES
+ products          | price          | numeric                     | NO
+ products          | stock          | integer                     | NO
+ products          | unit           | character varying           | YES
+ products          | min_stock      | integer                     | YES
+ products          | created_at     | timestamp without time zone | YES
+ transaction_items | id             | bigint                      | NO
+ transaction_items | transaction_id | bigint                      | NO
+ transaction_items | product_id     | bigint                      | NO
+ transaction_items | quantity       | integer                     | NO
+ transaction_items | price          | numeric                     | NO
+ transaction_items | subtotal       | numeric                     | NO
+ transactions      | id             | bigint                      | NO
+ transactions      | business_id    | bigint                      | NO
+ transactions      | invoice_number | character varying           | NO
+ transactions      | total_amount   | numeric                     | NO
+ transactions      | payment_method | character varying           | YES
+ transactions      | created_at     | timestamp without time zone | YES
+ users             | id             | bigint                      | NO
+ users             | name           | character varying           | NO
+ users             | email          | character varying           | NO
+ users             | password_hash  | text                        | NO
+ users             | created_at     | timestamp without time zone | YES
+(35 rows)
+

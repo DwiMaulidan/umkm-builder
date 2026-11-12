@@ -1,0 +1,45 @@
+﻿    table_name     |             constraint_name              | constraint_type |  column_name   | references_table  | references_column 
+-------------------+------------------------------------------+-----------------+----------------+-------------------+-------------------
+ business_members  | 2200_16412_1_not_null                    | CHECK           |                |                   | 
+ business_members  | business_members_business_id_fkey        | FOREIGN KEY     | business_id    | businesses        | id
+ business_members  | business_members_user_id_fkey            | FOREIGN KEY     | user_id        | users             | id
+ business_members  | business_members_pkey                    | PRIMARY KEY     | id             | business_members  | id
+ business_members  | business_members_user_id_business_id_key | UNIQUE          | business_id    | business_members  | business_id
+ business_members  | business_members_user_id_business_id_key | UNIQUE          | business_id    | business_members  | user_id
+ business_members  | business_members_user_id_business_id_key | UNIQUE          | user_id        | business_members  | business_id
+ business_members  | business_members_user_id_business_id_key | UNIQUE          | user_id        | business_members  | user_id
+ businesses        | 2200_16402_1_not_null                    | CHECK           |                |                   | 
+ businesses        | 2200_16402_2_not_null                    | CHECK           |                |                   | 
+ businesses        | businesses_pkey                          | PRIMARY KEY     | id             | businesses        | id
+ products          | 2200_16432_1_not_null                    | CHECK           |                |                   | 
+ products          | 2200_16432_2_not_null                    | CHECK           |                |                   | 
+ products          | 2200_16432_3_not_null                    | CHECK           |                |                   | 
+ products          | 2200_16432_5_not_null                    | CHECK           |                |                   | 
+ products          | 2200_16432_6_not_null                    | CHECK           |                |                   | 
+ products          | products_business_id_fkey                | FOREIGN KEY     | business_id    | businesses        | id
+ products          | products_pkey                            | PRIMARY KEY     | id             | products          | id
+ transaction_items | 2200_16465_1_not_null                    | CHECK           |                |                   | 
+ transaction_items | 2200_16465_2_not_null                    | CHECK           |                |                   | 
+ transaction_items | 2200_16465_3_not_null                    | CHECK           |                |                   | 
+ transaction_items | 2200_16465_4_not_null                    | CHECK           |                |                   | 
+ transaction_items | 2200_16465_5_not_null                    | CHECK           |                |                   | 
+ transaction_items | 2200_16465_6_not_null                    | CHECK           |                |                   | 
+ transaction_items | transaction_items_quantity_check         | CHECK           |                | transaction_items | quantity
+ transaction_items | transaction_items_transaction_id_fkey    | FOREIGN KEY     | transaction_id | transactions      | id
+ transaction_items | transaction_items_product_id_fkey        | FOREIGN KEY     | product_id     | products          | id
+ transaction_items | transaction_items_pkey                   | PRIMARY KEY     | id             | transaction_items | id
+ transactions      | 2200_16449_4_not_null                    | CHECK           |                |                   | 
+ transactions      | 2200_16449_2_not_null                    | CHECK           |                |                   | 
+ transactions      | 2200_16449_3_not_null                    | CHECK           |                |                   | 
+ transactions      | 2200_16449_1_not_null                    | CHECK           |                |                   | 
+ transactions      | transactions_business_id_fkey            | FOREIGN KEY     | business_id    | businesses        | id
+ transactions      | transactions_pkey                        | PRIMARY KEY     | id             | transactions      | id
+ transactions      | transactions_invoice_number_key          | UNIQUE          | invoice_number | transactions      | invoice_number
+ users             | 2200_16390_1_not_null                    | CHECK           |                |                   | 
+ users             | 2200_16390_2_not_null                    | CHECK           |                |                   | 
+ users             | 2200_16390_3_not_null                    | CHECK           |                |                   | 
+ users             | 2200_16390_4_not_null                    | CHECK           |                |                   | 
+ users             | users_pkey                               | PRIMARY KEY     | id             | users             | id
+ users             | users_email_key                          | UNIQUE          | email          | users             | email
+(41 rows)
+
