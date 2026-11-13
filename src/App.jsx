@@ -3,6 +3,7 @@ import Dashboard from "./pages/Dashboard";
 import ProductStock from "./pages/ProductStock";
 import Transactions from "./pages/Transactions";
 import SettingsPage from "./pages/SettingsPage";
+import TemplateWorkflow from "./pages/TemplateWorkflow";
 
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
@@ -176,6 +177,8 @@ function MainApp() {
             <Transactions />
           ) : activePage === "Pengaturan" ? (
             <SettingsPage />
+          ) : activePage === "Template" ? (
+            <TemplateWorkflow onNavigate={setActivePage} />
           ) : (
             <PlaceholderPage title={activePage} />
           )}
