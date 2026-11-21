@@ -4,6 +4,7 @@ import ProductStock from "./pages/ProductStock";
 import Transactions from "./pages/Transactions";
 import SettingsPage from "./pages/SettingsPage";
 import TemplateWorkflow from "./pages/TemplateWorkflow";
+import LandingPage from "./pages/LandingPage";
 
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
@@ -198,7 +199,7 @@ function App() {
       <Routes>
         <Route
           path="/"
-          element={<Navigate to="/login" replace />}
+          element={<LandingPage />}
         />
 
         <Route
@@ -218,7 +219,7 @@ function App() {
 
         <Route
           path="*"
-          element={<Navigate to="/login" replace />}
+          element={<Navigate to="/" replace />}
         />
       </Routes>
     </BrowserRouter>
