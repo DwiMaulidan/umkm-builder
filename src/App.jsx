@@ -1,10 +1,11 @@
-
 import Dashboard from "./pages/Dashboard";
 import ProductStock from "./pages/ProductStock";
 import Transactions from "./pages/Transactions";
 import SettingsPage from "./pages/SettingsPage";
 import TemplateWorkflow from "./pages/TemplateWorkflow";
 import LandingPage from "./pages/LandingPage";
+import Customers from "./pages/Customers";
+import Reports from "./pages/Reports";
 
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
@@ -180,6 +181,10 @@ function MainApp() {
             <SettingsPage />
           ) : activePage === "Template" ? (
             <TemplateWorkflow onNavigate={setActivePage} />
+          ) : activePage === "Pelanggan" ? (
+            <Customers />
+          ) : activePage === "Laporan" ? (
+            <Reports />
           ) : (
             <PlaceholderPage title={activePage} />
           )}
