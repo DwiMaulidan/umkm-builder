@@ -7,6 +7,7 @@ import LandingPage from "./pages/LandingPage";
 import Customers from "./pages/Customers";
 import Reports from "./pages/Reports";
 import WorkflowBuilder from "./pages/WorkflowBuilder";
+import Integrations from "./pages/Integrations";
 
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
@@ -45,7 +46,7 @@ const menuItems = [
   { name: "Laporan", icon: ChartColumn },
   { name: "Workflow Builder", icon: Workflow, tag: "Utama" },
   { name: "Template", icon: Blocks },
-  { name: "Integrasi", icon: Plug },
+  { name: "Integrasi", icon: Plug, tag: "QRIS & WA" },
   { name: "Pengaturan", icon: SettingsIcon },
 ];
 
@@ -188,6 +189,8 @@ function MainApp() {
             <Reports />
           ) : activePage === "Workflow Builder" ? (
             <WorkflowBuilder />
+          ) : activePage === "Integrasi" ? (
+            <Integrations />
           ) : (
             <PlaceholderPage title={activePage} />
           )}
