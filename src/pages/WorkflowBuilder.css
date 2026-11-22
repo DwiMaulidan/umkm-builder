@@ -55,8 +55,8 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 10px 16px;
-  padding: 10px 18px;
+  gap: 8px 12px;
+  padding: 9px 16px;
   background: #fff;
   border-bottom: 1px solid var(--wb-border);
 }
@@ -65,7 +65,12 @@
 .wb-toolbar-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+}
+
+/* Jika toolbar membungkus, tombol aksi tetap rata kanan. */
+.wb-toolbar-right {
+  margin-left: auto;
 }
 
 .wb-crumb {
@@ -80,7 +85,7 @@
 }
 
 .wb-name {
-  width: 150px;
+  width: 120px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
@@ -214,7 +219,7 @@
   gap: 7px;
   border: 1px solid transparent;
   border-radius: 8px;
-  padding: 8px 13px;
+  padding: 8px 11px;
   font-size: 12px;
   font-weight: 600;
   line-height: 1.2;
@@ -687,10 +692,6 @@
   top: -8px;
 }
 
-.wb-port-bottom {
-  bottom: -6px;
-}
-
 .wb-node.is-selected .wb-port {
   background: var(--wb-green);
 }
@@ -820,6 +821,10 @@
   padding-top: 14px;
 }
 
+.wb-section > h3 {
+  margin-bottom: 10px;
+}
+
 .wb-method {
   display: flex;
   align-items: center;
@@ -891,10 +896,6 @@
 
 .wb-text-link:hover {
   text-decoration: underline;
-}
-
-.wb-radio-group h3 {
-  margin-bottom: 8px;
 }
 
 .wb-radio {
@@ -1035,7 +1036,205 @@
   color: #fff;
 }
 
+/* ---------- Sambungan antar-blok ---------- */
+
+.wb-handle {
+  position: absolute;
+  z-index: 4;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--wb-node-color);
+  box-shadow: 0 0 0 1px var(--wb-node-color);
+  cursor: crosshair;
+  touch-action: none;
+  transition: transform 0.12s;
+}
+
+.wb-handle:hover {
+  transform: scale(1.3);
+}
+
+.wb-handle-bottom {
+  bottom: -9px;
+  left: 50%;
+  margin-left: -8px;
+}
+
+.wb-handle-left {
+  left: -9px;
+  top: 50%;
+  margin-top: -8px;
+}
+
+.wb-handle-right {
+  right: -9px;
+  top: 50%;
+  margin-top: -8px;
+}
+
+.wb-node.is-selected .wb-handle {
+  background: var(--wb-green);
+  box-shadow: 0 0 0 1px var(--wb-green);
+}
+
+.wb-stage.is-linking,
+.wb-stage.is-linking .wb-node {
+  cursor: crosshair;
+}
+
+.wb-node.is-link-target {
+  outline: 2px dashed #16a34a;
+  outline-offset: 4px;
+}
+
+.wb-edge-temp {
+  fill: none;
+  stroke: #16a34a;
+  stroke-width: 2.5;
+  stroke-dasharray: 6 5;
+}
+
+.wb-edge .wb-edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 18;
+  stroke-dasharray: none;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.wb-edge.is-selected path:not(.wb-edge-hit) {
+  stroke-width: 4;
+}
+
+.wb-edge-del {
+  position: absolute;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transform: translate(-50%, -50%);
+  border: 1px solid #f4b6c0;
+  border-radius: 20px;
+  background: #fff;
+  padding: 5px 11px;
+  color: #be123c;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px #172b4d29;
+}
+
+.wb-edge-del:hover {
+  background: #fdecee;
+}
+
+.wb-node-warn {
+  position: absolute;
+  top: -26px;
+  left: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #f5d28a;
+  border-radius: 20px;
+  background: #fff7e0;
+  padding: 2px 8px;
+  color: #92400e;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.wb-link-note {
+  display: block;
+  color: var(--wb-muted);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+/* ---------- Banner template & dialog ---------- */
+
+.wb-offer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #cfe9e2;
+  background: #f2faf8;
+  padding: 9px 18px;
+  color: var(--wb-green);
+  font-size: 12px;
+}
+
+.wb-offer svg {
+  flex-shrink: 0;
+}
+
+.wb-offer p {
+  flex: 1;
+  min-width: 0;
+  color: var(--wb-ink);
+  line-height: 1.5;
+}
+
+.wb-offer-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.wb-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: #0f1c2e80;
+}
+
+.wb-modal {
+  width: min(420px, 100%);
+  border-radius: 14px;
+  background: #fff;
+  padding: 22px;
+  box-shadow: 0 20px 50px #0f1c2e40;
+}
+
+.wb-modal h2 {
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+
+.wb-modal p {
+  margin-bottom: 18px;
+  color: var(--wb-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.wb-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.wb-empty .wb-btn {
+  margin-top: 4px;
+}
+
 /* ---------- Responsif ---------- */
+
+@media (max-width: 1500px) {
+  .wb-crumb,
+  .wb-slash {
+    display: none;
+  }
+}
 
 @media (max-width: 1250px) {
   .wb-body {
@@ -1075,6 +1274,12 @@
 
   .wb-config-body {
     overflow-y: visible;
+  }
+}
+
+@media (max-width: 780px) {
+  .wb-offer {
+    flex-wrap: wrap;
   }
 }
 

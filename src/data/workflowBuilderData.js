@@ -1,3 +1,5 @@
+import { BLANK_TEMPLATE_ID } from "./workflowTemplates";
+
 // ===============================
 // DATA WORKFLOW BUILDER
 // ===============================
@@ -22,6 +24,7 @@ export const NODE_TYPES = {
   print: { label: "Cetak Struk", color: "#0369a1" },
   whatsapp: { label: "Notifikasi WA", color: "#15a34a" },
   warning: { label: "Peringatan", color: "#dc2626" },
+  custom: { label: "Langkah Kustom", color: "#7c3aed" },
   cancel: { label: "Batalkan", color: "#475569", terminal: true },
   end: { label: "Alur Sukses Selesai", color: "#334155", terminal: true },
 };
@@ -126,6 +129,13 @@ export const PALETTE_GROUPS = [
         title: "Cetak Struk Transaksi",
         desc: "Printer thermal Bluetooth",
       },
+      {
+        id: "p-verif",
+        type: "system",
+        icon: "shield",
+        title: "Verifikasi Pembayaran",
+        desc: "Cek QRIS / tunai otomatis",
+      },
     ],
   },
   {
@@ -160,6 +170,41 @@ export const PALETTE_GROUPS = [
         icon: "phone",
         title: "Kirim WA ke Pelanggan",
         desc: "Status siap & link nota",
+      },
+    ],
+  },
+  {
+    id: "finish",
+    label: "Akhir Alur",
+    color: "#475569",
+    items: [
+      {
+        id: "p-selesai",
+        type: "end",
+        icon: "flag",
+        title: "Selesai & Arsipkan",
+        desc: "Tutup pesanan, catat ke riwayat",
+      },
+      {
+        id: "p-batal",
+        type: "cancel",
+        icon: "ban",
+        title: "Batalkan Pesanan",
+        desc: "Kembalikan stok / antrean",
+      },
+    ],
+  },
+  {
+    id: "free",
+    label: "Langkah Bebas",
+    color: "#7c3aed",
+    items: [
+      {
+        id: "p-custom",
+        type: "custom",
+        icon: "pen",
+        title: "Langkah Kustom",
+        desc: "Tulis sendiri langkah usaha Anda",
       },
     ],
   },
@@ -350,5 +395,99 @@ export function saveWorkflowDraft(draft) {
     return true;
   } catch {
     return false;
+  }
+}
+
+// ===============================
+// TEMPLATE -> ALUR DI KANVAS
+// ===============================
+// Jenis blok untuk tiap langkah template (urutannya sama dengan
+// daftar langkah di src/data/workflowTemplates.js).
+
+const TEMPLATE_STEP_TYPES = {
+  "kedai-resto": ["trigger", "system", "kitchen", "stock", "end"],
+  "retail-kasir": ["trigger", "print", "stock", "warning"],
+  "jasa-reservasi": [
+    "trigger",
+    "system",
+    "system",
+    "whatsapp",
+    "system",
+    "end",
+  ],
+  "katering-online": ["trigger", "system", "kitchen", "system", "end"],
+  "grosir-b2b": ["trigger", "print", "system", "end"],
+};
+
+// Template Kanvas Kosong (atau template tanpa langkah) menghasilkan
+// kanvas kosong. Selain itu, langkah disusun lurus ke bawah dan
+// disambung berurutan.
+export function buildFlowFromTemplate(template) {
+  if (
+    !template ||
+    template.id === BLANK_TEMPLATE_ID ||
+    !Array.isArray(template.steps) ||
+    template.steps.length === 0
+  ) {
+    return { nodes: [], edges: [] };
+  }
+
+  const steps = template.steps;
+  const types =
+    TEMPLATE_STEP_TYPES[template.id] ||
+    steps.map((_, i) =>
+      i === 0 ? "trigger" : i === steps.length - 1 ? "end" : "system"
+    );
+
+  let y = 0;
+  const nodes = steps.map((step, i) => {
+    const type = types[i] || "system";
+    const isStock = type === "stock";
+    const h = isStock ? STOCK_NODE_HEIGHT : NODE_HEIGHT;
+    const num = String(i + 1).padStart(2, "0");
+    const node = {
+      id: `t${i + 1}`,
+      type,
+      code: type === "end" ? "" : `#${num}`,
+      key: `node_${type}_${num}`,
+      title: step.title,
+      detail: step.detail,
+      x: 244,
+      y,
+      w: NODE_WIDTH,
+      h,
+      ...(isStock ? { config: createDefaultStockConfig() } : {}),
+    };
+    y += h + 36;
+    return node;
+  });
+
+  const edges = nodes.slice(1).map((node, i) => ({
+    id: `te${i + 1}`,
+    from: nodes[i].id,
+    to: node.id,
+    variant: "flow",
+  }));
+
+  return { nodes, edges };
+}
+
+// Penanda "template ini sudah ditawarkan/dimuat" supaya banner
+// tidak muncul berulang untuk pilihan yang sama.
+const TEMPLATE_STAMP_KEY = "umkm_workflow_template_loaded";
+
+export function getTemplateStamp() {
+  try {
+    return localStorage.getItem(TEMPLATE_STAMP_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setTemplateStamp(stamp) {
+  try {
+    localStorage.setItem(TEMPLATE_STAMP_KEY, stamp);
+  } catch {
+    /* penyimpanan ditolak: banner boleh muncul lagi */
   }
 }
