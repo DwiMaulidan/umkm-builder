@@ -7,9 +7,11 @@ import {
   ChefHat,
   CircleCheck,
   CirclePlay,
+  FilePlus2,
   Flag,
   GitFork,
   LayoutGrid,
+  LayoutTemplate,
   LocateFixed,
   Maximize,
   MessageCircle,
@@ -17,6 +19,7 @@ import {
   Monitor,
   MousePointerClick,
   Package,
+  PenLine,
   Printer,
   QrCode,
   Redo2,
@@ -27,6 +30,7 @@ import {
   Smartphone,
   Split,
   Trash2,
+  TriangleAlert,
   TrendingUp,
   Undo2,
   Workflow,
@@ -50,7 +54,14 @@ import {
   createDefaultStockConfig,
   loadWorkflowDraft,
   saveWorkflowDraft,
+  buildFlowFromTemplate,
+  getTemplateStamp,
+  setTemplateStamp,
 } from "../data/workflowBuilderData";
+import {
+  getSelectedTemplate,
+  workflowTemplates,
+} from "../data/workflowTemplates";
 import "./WorkflowBuilder.css";
 
 // ===============================
@@ -67,6 +78,10 @@ const PALETTE_ICONS = {
   badge: BadgeCheck,
   split: Split,
   phone: Smartphone,
+  shield: ShieldCheck,
+  flag: Flag,
+  ban: Ban,
+  pen: PenLine,
 };
 
 const NODE_ICONS = {
@@ -80,6 +95,7 @@ const NODE_ICONS = {
   warning: BellRing,
   cancel: Ban,
   end: Flag,
+  custom: PenLine,
 };
 
 const MIN_ZOOM = 40;
@@ -147,9 +163,9 @@ function autoConnect(node, nodes, edges) {
   for (const candidate of nodes) {
     if (NODE_TYPES[candidate.type].terminal) continue;
 
-    const outgoing = edges.filter((e) => e.from === candidate.id).length;
+    const outgoing = edges.filter((e) => e.from === candidate.id);
     const limit = candidate.type === "decision" ? 2 : 1;
-    if (outgoing >= limit) continue;
+    if (outgoing.length >= limit) continue;
 
     const gap = node.y - (candidate.y + candidate.h);
     if (gap < -20) continue;
@@ -167,7 +183,13 @@ function autoConnect(node, nodes, edges) {
   if (!best) return null;
 
   if (best.type === "decision") {
-    const goesLeft = centerX < best.x + best.w / 2;
+    // Pilih sisi sesuai posisi blok baru, tapi jangan pakai sisi yang
+    // sudah terisi.
+    const usedSides = new Set(
+      edges.filter((e) => e.from === best.id).map((e) => sideOf(e))
+    );
+    let goesLeft = centerX < best.x + best.w / 2;
+    if (usedSides.has(goesLeft ? "left" : "right")) goesLeft = !goesLeft;
     return {
       id: `e_${newId()}`,
       from: best.id,
@@ -208,8 +230,102 @@ function buildEdgeGeometry(edge, nodeMap) {
     side: edge.side,
     start,
     end,
+    mid: cubicPoint(start, c1, c2, end, 0.5),
     d: `M ${start.x} ${start.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${end.x} ${end.y}`,
   };
+}
+
+function cubicPoint(s, c1, c2, e, t) {
+  const u = 1 - t;
+  return {
+    x: u * u * u * s.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * e.x,
+    y: u * u * u * s.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * e.y,
+  };
+}
+
+// Garis sementara yang mengikuti pointer saat menarik sambungan.
+function buildTempPath(fromNode, side, point) {
+  const start = anchorPoint(fromNode, side);
+  const bend = 50;
+  let c1 = { x: start.x, y: start.y + bend };
+  if (side === "left") c1 = { x: start.x - bend, y: start.y };
+  if (side === "right") c1 = { x: start.x + bend, y: start.y };
+  return `M ${start.x} ${start.y} C ${c1.x} ${c1.y}, ${point.x} ${point.y - 40}, ${point.x} ${point.y}`;
+}
+
+// ---------- Aturan sambungan ----------
+
+// "Sisi" keluar sebuah blok: Percabangan punya kiri (Ya) dan kanan
+// (Tidak), blok lain hanya punya satu keluaran di bawah.
+function sideOf(edge) {
+  return edge.side || "bottom";
+}
+
+function reaches(edges, startId, targetId) {
+  const seen = new Set();
+  const stack = [startId];
+  while (stack.length > 0) {
+    const id = stack.pop();
+    if (id === targetId) return true;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    for (const edge of edges) {
+      if (edge.from === id) stack.push(edge.to);
+    }
+  }
+  return false;
+}
+
+// Boleh tidaknya menyambung (fromId, side) ke toId. Sambungan lama
+// pada sisi yang sama dianggap akan diganti.
+function validateLink(flow, fromId, side, toId) {
+  const from = flow.nodes.find((n) => n.id === fromId);
+  const to = flow.nodes.find((n) => n.id === toId);
+
+  if (!from || !to) return { ok: false, reason: "Blok tidak ditemukan." };
+  if (fromId === toId) {
+    return { ok: false, reason: "Blok tidak bisa disambung ke dirinya sendiri." };
+  }
+  if (NODE_TYPES[from.type].terminal) {
+    return {
+      ok: false,
+      reason: "Blok ini adalah akhir alur, jadi tidak punya langkah berikutnya.",
+    };
+  }
+  if (to.type === "trigger") {
+    return { ok: false, reason: "Pemicu Awal hanya bisa menjadi awal alur." };
+  }
+
+  const rest = flow.edges.filter(
+    (e) => !(e.from === fromId && sideOf(e) === side)
+  );
+  if (rest.some((e) => e.from === fromId && e.to === toId)) {
+    return { ok: false, reason: "Kedua blok ini sudah tersambung." };
+  }
+  if (reaches(rest, toId, fromId)) {
+    return { ok: false, reason: "Sambungan ini membuat alur berputar kembali." };
+  }
+  return { ok: true };
+}
+
+// Pasang (atau lepas, jika toId kosong) sambungan pada satu sisi blok.
+function withLink(flow, fromId, side, toId) {
+  const old = flow.edges.find(
+    (e) => e.from === fromId && sideOf(e) === side
+  );
+  const rest = flow.edges.filter((e) => e !== old);
+  if (!toId) return { ...flow, edges: rest };
+
+  const edge = {
+    id: old ? old.id : `e_${newId()}`,
+    from: fromId,
+    to: toId,
+    variant: side === "left" ? "ok" : side === "right" ? "fail" : "flow",
+    ...(side === "bottom" ? {} : { side }),
+    ...(side === "left" ? { label: old?.label || "Ya" } : {}),
+    ...(side === "right" ? { label: old?.label || "Tidak" } : {}),
+  };
+  return { ...flow, edges: [...rest, edge] };
 }
 
 function formatTime(date) {
@@ -220,7 +336,7 @@ function formatTime(date) {
 // PANEL KONFIGURASI BLOK (KANAN)
 // ===============================
 
-function ConfigPanel({ node, onApply, onDelete, onClose }) {
+function ConfigPanel({ node, terminal, outputs, onLink, onApply, onDelete, onClose }) {
   const type = NODE_TYPES[node.type];
   const isStock = node.type === "stock";
 
@@ -397,6 +513,39 @@ function ConfigPanel({ node, onApply, onDelete, onClose }) {
           </div>
         )}
 
+        <div className="wb-section">
+          <h3>Sambungan Alur</h3>
+          {terminal ? (
+            <p className="wb-section-text">
+              Blok ini adalah akhir alur, jadi tidak ada langkah berikutnya.
+            </p>
+          ) : (
+            <>
+              {outputs.map((output) => (
+                <div className="wb-field" key={output.side}>
+                  <label htmlFor={`wb-link-${output.side}`}>{output.label}</label>
+                  <select
+                    id={`wb-link-${output.side}`}
+                    value={output.value}
+                    onChange={(e) => onLink(output.side, e.target.value)}
+                  >
+                    <option value="">Belum disambung</option>
+                    {output.options.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+              <small className="wb-link-note">
+                Perubahan sambungan langsung diterapkan. Bisa juga dengan
+                menarik titik bulat di blok ke blok tujuan.
+              </small>
+            </>
+          )}
+        </div>
+
         <div className="wb-config-actions">
           <button
             type="button"
@@ -449,8 +598,25 @@ function WorkflowBuilder() {
   const [toast, setToast] = useState(null);
   const [runningId, setRunningId] = useState(null);
   const [testing, setTesting] = useState(false);
+  const [selectedEdgeId, setSelectedEdgeId] = useState(null);
+  const [linking, setLinking] = useState(null);
+  const [confirmNew, setConfirmNew] = useState(false);
+  // Tawaran memuat template yang dipilih di halaman Template.
+  const [offer, setOffer] = useState(() => {
+    const chosen = getSelectedTemplate();
+    if (!chosen || !chosen.appliedAt) return null;
+    if (getTemplateStamp() === chosen.appliedAt) return null;
+    const template = workflowTemplates.find((t) => t.id === chosen.id) || {
+      id: chosen.id,
+      title: chosen.title,
+      steps: [],
+    };
+    return { stamp: chosen.appliedAt, template };
+  });
 
   const canvasRef = useRef(null);
+  const stageRef = useRef(null);
+  const linkRef = useRef(null);
   const dragRef = useRef(null);
   const timersRef = useRef([]);
 
@@ -483,6 +649,19 @@ function WorkflowBuilder() {
   }, [flow.nodes]);
 
   const selected = selectedId ? nodeMap.get(selectedId) || null : null;
+  const selectedEdge = selectedEdgeId
+    ? edgeShapes.find((e) => e.id === selectedEdgeId) || null
+    : null;
+
+  // Blok yang belum punya sambungan sama sekali.
+  const connectedIds = useMemo(
+    () => new Set(flow.edges.flatMap((e) => [e.from, e.to])),
+    [flow.edges]
+  );
+  const unlinkedCount =
+    flow.nodes.length > 1
+      ? flow.nodes.filter((n) => !connectedIds.has(n.id)).length
+      : 0;
 
   const filteredGroups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -513,7 +692,10 @@ function WorkflowBuilder() {
   // Escape menutup panel konfigurasi.
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === "Escape") setSelectedId(null);
+      if (e.key === "Escape") {
+        setSelectedId(null);
+        setSelectedEdgeId(null);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -521,6 +703,16 @@ function WorkflowBuilder() {
 
   function showToast(message, kind = "success") {
     setToast({ message, kind });
+  }
+
+  function selectNode(id) {
+    setSelectedId(id);
+    setSelectedEdgeId(null);
+  }
+
+  function clearSelection() {
+    setSelectedId(null);
+    setSelectedEdgeId(null);
   }
 
   // Semua perubahan "satu langkah" lewat sini agar bisa di-undo.
@@ -576,7 +768,7 @@ function WorkflowBuilder() {
       nodes: [...flow.nodes, node],
       edges: edge ? [...flow.edges, edge] : flow.edges,
     });
-    setSelectedId(node.id);
+    selectNode(node.id);
     showToast(
       edge
         ? `Blok "${item.title}" ditambahkan dan disambungkan.`
@@ -611,7 +803,7 @@ function WorkflowBuilder() {
       nodes: flow.nodes.filter((n) => n.id !== id),
       edges: flow.edges.filter((e) => e.from !== id && e.to !== id),
     });
-    setSelectedId(null);
+    clearSelection();
     showToast(`Blok "${node.title}" dihapus. Gunakan Undo untuk mengembalikan.`, "info");
   }
 
@@ -668,17 +860,194 @@ function WorkflowBuilder() {
   function onNodePointerUp() {
     const drag = dragRef.current;
     dragRef.current = null;
-    if (drag && !drag.moved) setSelectedId(drag.id);
+    if (drag && !drag.moved) selectNode(drag.id);
   }
 
   function onNodeKeyDown(e, node) {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      setSelectedId(node.id);
+      selectNode(node.id);
     } else if (e.key === "Delete" || e.key === "Backspace") {
       e.preventDefault();
       removeNode(node.id);
     }
+  }
+
+  // ---------- Sambungan antar-blok ----------
+
+  // Pasang/lepas sambungan. Mengembalikan true jika berhasil.
+  function setLink(fromId, side, toId) {
+    if (toId) {
+      const check = validateLink(flow, fromId, side, toId);
+      if (!check.ok) {
+        showToast(check.reason, "error");
+        return false;
+      }
+    }
+    commit(withLink(flow, fromId, side, toId));
+    return true;
+  }
+
+  function removeEdge(id) {
+    commit({ ...flow, edges: flow.edges.filter((e) => e.id !== id) });
+    setSelectedEdgeId(null);
+    showToast("Sambungan dihapus. Gunakan Undo untuk mengembalikan.", "info");
+  }
+
+  function toStagePoint(e) {
+    const rect = stageRef.current.getBoundingClientRect();
+    return { x: (e.clientX - rect.left) / scale, y: (e.clientY - rect.top) / scale };
+  }
+
+  function nodeAt(point) {
+    for (let i = flow.nodes.length - 1; i >= 0; i -= 1) {
+      const n = flow.nodes[i];
+      if (
+        point.x >= n.x - 6 &&
+        point.x <= n.x + n.w + 6 &&
+        point.y >= n.y - 6 &&
+        point.y <= n.y + n.h + 6
+      ) {
+        return n;
+      }
+    }
+    return null;
+  }
+
+  function startLink(e, node, side) {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const point = toStagePoint(e);
+    linkRef.current = {
+      from: node.id,
+      side,
+      startX: e.clientX,
+      startY: e.clientY,
+      moved: false,
+    };
+    setLinking({ from: node.id, side, x: point.x, y: point.y, target: null });
+  }
+
+  function moveLink(e) {
+    const link = linkRef.current;
+    if (!link) return;
+    if (
+      !link.moved &&
+      Math.hypot(e.clientX - link.startX, e.clientY - link.startY) > 4
+    ) {
+      link.moved = true;
+    }
+    const point = toStagePoint(e);
+    const hit = nodeAt(point);
+    const target =
+      hit && hit.id !== link.from && validateLink(flow, link.from, link.side, hit.id).ok
+        ? hit.id
+        : null;
+    setLinking({ from: link.from, side: link.side, x: point.x, y: point.y, target });
+  }
+
+  function endLink(e) {
+    const link = linkRef.current;
+    linkRef.current = null;
+    setLinking(null);
+    if (!link || !link.moved) return;
+
+    const hit = nodeAt(toStagePoint(e));
+    if (!hit || hit.id === link.from) {
+      showToast("Lepas di atas blok tujuan untuk menyambung.", "info");
+      return;
+    }
+    const replaced = flow.edges.some(
+      (edge) =>
+        edge.from === link.from &&
+        sideOf(edge) === link.side &&
+        edge.to !== hit.id
+    );
+    if (setLink(link.from, link.side, hit.id)) {
+      showToast(
+        replaced
+          ? "Blok tersambung. Sambungan lama dari blok ini diganti."
+          : "Blok tersambung."
+      );
+    }
+  }
+
+  function cancelLink() {
+    linkRef.current = null;
+    setLinking(null);
+  }
+
+  // Pilihan "lanjut ke" untuk panel konfigurasi.
+  function getOutputs(node) {
+    if (NODE_TYPES[node.type].terminal) return [];
+    const defs =
+      node.type === "decision"
+        ? [
+            { side: "left", label: "Jika Ya, lanjut ke" },
+            { side: "right", label: "Jika Tidak, lanjut ke" },
+          ]
+        : [{ side: "bottom", label: "Lanjut ke langkah" }];
+
+    return defs.map((def) => {
+      const current = flow.edges.find(
+        (e) => e.from === node.id && sideOf(e) === def.side
+      );
+      const options = flow.nodes
+        .filter((n) => validateLink(flow, node.id, def.side, n.id).ok)
+        .map((n) => ({
+          id: n.id,
+          label: `${n.code ? `${n.code} ` : ""}${n.title}`,
+        }));
+      return { ...def, value: current ? current.to : "", options };
+    });
+  }
+
+  // ---------- Alur baru & template ----------
+
+  function askNewFlow() {
+    if (flow.nodes.length === 0) {
+      showToast("Kanvas sudah kosong. Tarik atau klik blok untuk memulai.", "info");
+      return;
+    }
+    setConfirmNew(true);
+  }
+
+  function startNewFlow() {
+    setConfirmNew(false);
+    commit({ nodes: [], edges: [] });
+    setName("Alur Baru");
+    clearSelection();
+    showToast("Kanvas dikosongkan. Gunakan Undo untuk mengembalikan alur sebelumnya.", "info");
+  }
+
+  function loadExample() {
+    commit(createDefaultFlow());
+    setName(DEFAULT_WORKFLOW_NAME);
+    clearSelection();
+    showToast("Alur contoh dimuat. Gunakan Undo untuk membatalkan.", "info");
+  }
+
+  function loadTemplate() {
+    if (!offer) return;
+    const { template, stamp } = offer;
+    const isBlank = template.steps.length === 0;
+    commit(buildFlowFromTemplate(template));
+    setName(isBlank ? "Alur Baru" : template.title.slice(0, 60));
+    setTemplateStamp(stamp);
+    setOffer(null);
+    clearSelection();
+    showToast(
+      isBlank
+        ? "Kanvas kosong siap. Tarik blok dari panel kiri untuk mulai."
+        : `Template "${template.title}" dimuat. Gunakan Undo untuk mengembalikan alur sebelumnya.`
+    );
+  }
+
+  function dismissOffer() {
+    if (offer) setTemplateStamp(offer.stamp);
+    setOffer(null);
   }
 
   // ---------- Uji coba, simpan, publikasi ----------
@@ -705,6 +1074,14 @@ function WorkflowBuilder() {
         outs.find((e) => e.variant !== "fail") ||
         outs[0];
       current = next ? nodeMap.get(next.to) : null;
+    }
+
+    if (path.length < 2) {
+      showToast(
+        "Pemicu Awal belum tersambung ke blok lain. Sambungkan dulu sebelum uji coba.",
+        "error"
+      );
+      return;
     }
 
     setTesting(true);
@@ -744,6 +1121,17 @@ function WorkflowBuilder() {
     }
     if (flow.nodes.length < 2) {
       showToast("Alur belum bisa dipublikasikan: minimal 2 blok.", "error");
+      return;
+    }
+    if (flow.edges.length === 0) {
+      showToast("Sambungkan minimal dua blok sebelum alur dipublikasikan.", "error");
+      return;
+    }
+    if (unlinkedCount > 0) {
+      showToast(
+        `Masih ada ${unlinkedCount} blok yang belum tersambung. Sambungkan atau hapus dulu sebelum publikasi.`,
+        "error"
+      );
       return;
     }
     setLive(true);
@@ -849,6 +1237,10 @@ function WorkflowBuilder() {
         </div>
 
         <div className="wb-toolbar-right">
+          <button type="button" className="wb-btn wb-btn-ghost" onClick={askNewFlow}>
+            <FilePlus2 size={15} />
+            Alur Baru
+          </button>
           <button
             type="button"
             className="wb-btn wb-btn-outline"
@@ -869,6 +1261,24 @@ function WorkflowBuilder() {
       </div>
 
       {/* ===== BADAN: PALET | KANVAS | KONFIGURASI ===== */}
+      {offer && (
+        <div className="wb-offer" role="region" aria-label="Template dipilih">
+          <LayoutTemplate size={16} aria-hidden="true" />
+          <p>
+            Template <b>“{offer.template.title}”</b> dipilih di halaman
+            Template. Muat ke kanvas sebagai titik awal?
+          </p>
+          <div className="wb-offer-actions">
+            <button type="button" className="wb-btn wb-btn-primary" onClick={loadTemplate}>
+              Muat ke Kanvas
+            </button>
+            <button type="button" className="wb-btn wb-btn-ghost" onClick={dismissOffer}>
+              Nanti Saja
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className={`wb-body ${selected ? "" : "no-config"}`}>
         {/* ----- Panel komponen ----- */}
         <aside className="wb-palette" aria-label="Komponen alur">
@@ -954,7 +1364,7 @@ function WorkflowBuilder() {
           }}
           onDrop={handleDrop}
           onClick={(e) => {
-            if (e.target === e.currentTarget) setSelectedId(null);
+            if (e.target === e.currentTarget) clearSelection();
           }}
         >
           <div
@@ -962,14 +1372,15 @@ function WorkflowBuilder() {
             style={{ width: stage.w * scale, height: stage.h * scale }}
           >
             <div
-              className="wb-stage"
+              ref={stageRef}
+              className={`wb-stage ${linking ? "is-linking" : ""}`}
               style={{
                 width: stage.w,
                 height: stage.h,
                 transform: `scale(${scale})`,
               }}
               onClick={(e) => {
-                if (e.target === e.currentTarget) setSelectedId(null);
+                if (e.target === e.currentTarget) clearSelection();
               }}
             >
               <svg
@@ -979,13 +1390,45 @@ function WorkflowBuilder() {
                 aria-hidden="true"
               >
                 {edgeShapes.map((edge) => (
-                  <g key={edge.id} className={`wb-edge wb-edge-${edge.variant}`}>
+                  <g
+                    key={edge.id}
+                    className={`wb-edge wb-edge-${edge.variant} ${
+                      edge.id === selectedEdgeId ? "is-selected" : ""
+                    }`}
+                  >
                     <path d={edge.d} />
                     <circle cx={edge.start.x} cy={edge.start.y} r="3.5" />
                     <circle cx={edge.end.x} cy={edge.end.y} r="3.5" />
+                    <path
+                      className="wb-edge-hit"
+                      d={edge.d}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedEdgeId(edge.id);
+                        setSelectedId(null);
+                      }}
+                    />
                   </g>
                 ))}
+                {linking && nodeMap.get(linking.from) && (
+                  <path
+                    className="wb-edge-temp"
+                    d={buildTempPath(nodeMap.get(linking.from), linking.side, linking)}
+                  />
+                )}
               </svg>
+
+              {selectedEdge && (
+                <button
+                  type="button"
+                  className="wb-edge-del"
+                  style={{ left: selectedEdge.mid.x, top: selectedEdge.mid.y }}
+                  onClick={() => removeEdge(selectedEdge.id)}
+                >
+                  <Trash2 size={12} aria-hidden="true" />
+                  Hapus sambungan
+                </button>
+              )}
 
               {edgeShapes
                 .filter((edge) => edge.label)
@@ -1011,6 +1454,10 @@ function WorkflowBuilder() {
                 const Icon = NODE_ICONS[node.type];
                 const isSelected = node.id === selectedId;
                 const isRunning = node.id === runningId;
+                const isTerminal = Boolean(type.terminal);
+                const isLinkTarget = linking?.target === node.id;
+                const isUnlinked =
+                  flow.nodes.length > 1 && !connectedIds.has(node.id);
 
                 return (
                   <div
@@ -1021,7 +1468,7 @@ function WorkflowBuilder() {
                     aria-label={`${type.label}: ${node.title}`}
                     className={`wb-node ${isSelected ? "is-selected" : ""} ${
                       isRunning ? "is-running" : ""
-                    }`}
+                    } ${isLinkTarget ? "is-link-target" : ""}`}
                     style={{
                       left: node.x,
                       top: node.y,
@@ -1037,8 +1484,47 @@ function WorkflowBuilder() {
                     }}
                     onKeyDown={(e) => onNodeKeyDown(e, node)}
                   >
-                    <span className="wb-port wb-port-top" aria-hidden="true" />
-                    <span className="wb-port wb-port-bottom" aria-hidden="true" />
+                    {node.type !== "trigger" && (
+                      <span className="wb-port wb-port-top" aria-hidden="true" />
+                    )}
+
+                    {!isTerminal &&
+                      (node.type === "decision" ? (
+                        <>
+                          <span
+                            className="wb-handle wb-handle-left"
+                            title="Tarik ke blok lain: jika Ya"
+                            onPointerDown={(e) => startLink(e, node, "left")}
+                            onPointerMove={moveLink}
+                            onPointerUp={endLink}
+                            onPointerCancel={cancelLink}
+                          />
+                          <span
+                            className="wb-handle wb-handle-right"
+                            title="Tarik ke blok lain: jika Tidak"
+                            onPointerDown={(e) => startLink(e, node, "right")}
+                            onPointerMove={moveLink}
+                            onPointerUp={endLink}
+                            onPointerCancel={cancelLink}
+                          />
+                        </>
+                      ) : (
+                        <span
+                          className="wb-handle wb-handle-bottom"
+                          title="Tarik ke blok lain untuk menyambung"
+                          onPointerDown={(e) => startLink(e, node, "bottom")}
+                          onPointerMove={moveLink}
+                          onPointerUp={endLink}
+                          onPointerCancel={cancelLink}
+                        />
+                      ))}
+
+                    {isUnlinked && (
+                      <span className="wb-node-warn">
+                        <TriangleAlert size={10} aria-hidden="true" />
+                        Belum tersambung
+                      </span>
+                    )}
 
                     <div className="wb-node-head">
                       <span className="wb-node-kind">
@@ -1074,8 +1560,15 @@ function WorkflowBuilder() {
                   <b>Kanvas masih kosong</b>
                   <span>
                     Tarik blok dari panel kiri, atau klik blok untuk
-                    menambahkannya.
+                    menambahkannya. Mulai dengan blok Pemicu Awal.
                   </span>
+                  <button
+                    type="button"
+                    className="wb-btn wb-btn-outline"
+                    onClick={loadExample}
+                  >
+                    Muat Alur Contoh
+                  </button>
                 </div>
               )}
             </div>
@@ -1087,12 +1580,60 @@ function WorkflowBuilder() {
           <ConfigPanel
             key={`${selected.id}:${version}`}
             node={selected}
+            terminal={Boolean(NODE_TYPES[selected.type].terminal)}
+            outputs={getOutputs(selected)}
+            onLink={(side, toId) => {
+              if (setLink(selected.id, side, toId)) {
+                showToast(toId ? "Sambungan diperbarui." : "Sambungan dilepas.", "info");
+              }
+            }}
             onApply={applyChanges}
             onDelete={() => removeNode(selected.id)}
-            onClose={() => setSelectedId(null)}
+            onClose={clearSelection}
           />
         )}
       </div>
+
+      {/* ===== KONFIRMASI ALUR BARU ===== */}
+      {confirmNew && (
+        <div
+          className="wb-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setConfirmNew(false);
+          }}
+        >
+          <div
+            className="wb-modal"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="wb-new-title"
+            aria-describedby="wb-new-desc"
+          >
+            <h2 id="wb-new-title">Mulai alur baru?</h2>
+            <p id="wb-new-desc">
+              Semua blok di kanvas akan dikosongkan. Kalau keliru, Anda masih
+              bisa menekan tombol Urungkan.
+            </p>
+            <div className="wb-modal-actions">
+              <button
+                type="button"
+                className="wb-btn wb-btn-outline"
+                autoFocus
+                onClick={() => setConfirmNew(false)}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                className="wb-btn wb-btn-primary"
+                onClick={startNewFlow}
+              >
+                Ya, Kosongkan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ===== TOAST ===== */}
       {toast && (
