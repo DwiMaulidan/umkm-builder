@@ -6,6 +6,7 @@ import TemplateWorkflow from "./pages/TemplateWorkflow";
 import LandingPage from "./pages/LandingPage";
 import Customers from "./pages/Customers";
 import Reports from "./pages/Reports";
+import WorkflowBuilder from "./pages/WorkflowBuilder";
 
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
@@ -185,6 +186,8 @@ function MainApp() {
             <Customers />
           ) : activePage === "Laporan" ? (
             <Reports />
+          ) : activePage === "Workflow Builder" ? (
+            <WorkflowBuilder />
           ) : (
             <PlaceholderPage title={activePage} />
           )}
