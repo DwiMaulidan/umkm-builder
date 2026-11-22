@@ -1,5 +1,10 @@
 require("dotenv").config();
 
+if (!process.env.JWT_SECRET) {
+  console.error("JWT_SECRET belum dikonfigurasi!");
+  process.exit(1);
+}
+
 const express = require("express");
 const cors = require("cors");
 const pool = require("./config/database");
@@ -8,6 +13,7 @@ const authenticateToken = require("./middleware/authMiddleware");
 const productRoutes = require("./routes/productRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const integrationRoutes = require("./routes/integrationRoutes");
+const transactionRoutes = require("./routes/transactionRoutes");
 
 const app = express();
 
@@ -18,6 +24,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/integrations", integrationRoutes);
+app.use("/api/transactions", transactionRoutes);
 
 app.get("/", (req, res) => {
   res.json({

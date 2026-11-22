@@ -20,13 +20,15 @@ const register = async (req, res) => {
 
   const normalizedEmail = email.trim().toLowerCase();
 
-  const client = await pool.connect();
+  let client;
 
   try {
+    client = await pool.connect();
+
     await client.query("BEGIN");
 
     const existingUser = await client.query(
-      "SELECT id FROM users WHERE email = $1",
+      "SELECT id FROM public.users WHERE email = $1",
       [normalizedEmail]
     );
 
@@ -40,7 +42,7 @@ const register = async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 12);
 
     const userResult = await client.query(
-      `INSERT INTO users (name, email, password_hash)
+      `INSERT INTO public.users (name, email, password_hash)
        VALUES ($1, $2, $3)
        RETURNING id, name, email`,
       [name.trim(), normalizedEmail, passwordHash]
@@ -49,7 +51,7 @@ const register = async (req, res) => {
     const user = userResult.rows[0];
 
     const businessResult = await client.query(
-      `INSERT INTO businesses (name)
+      `INSERT INTO public.businesses (name)
        VALUES ($1)
        RETURNING id, name`,
       [business_name.trim()]
@@ -58,7 +60,7 @@ const register = async (req, res) => {
     const business = businessResult.rows[0];
 
     await client.query(
-      `INSERT INTO business_members (user_id, business_id, role)
+      `INSERT INTO public.business_members (user_id, business_id, role)
        VALUES ($1, $2, 'owner')`,
       [user.id, business.id]
     );
@@ -81,14 +83,23 @@ const register = async (req, res) => {
       business,
     });
   } catch (error) {
-    await client.query("ROLLBACK");
+    if (client) {
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        console.error("Rollback error:", rollbackError);
+      }
+    }
+
     console.error("Register error:", error);
 
     return res.status(500).json({
       message: "Terjadi kesalahan saat registrasi",
     });
   } finally {
-    client.release();
+    if (client) {
+      client.release();
+    }
   }
 };
 
@@ -106,9 +117,9 @@ const login = async (req, res) => {
     const result = await pool.query(
       `SELECT u.id, u.name, u.email, u.password_hash,
               bm.business_id, bm.role, b.name AS business_name
-       FROM users u
-       JOIN business_members bm ON bm.user_id = u.id
-       JOIN businesses b ON b.id = bm.business_id
+       FROM public.users u
+      JOIN public.business_members bm ON bm.user_id = u.id
+      JOIN public.businesses b ON b.id = bm.business_id
        WHERE u.email = $1
        ORDER BY bm.id ASC
        LIMIT 1`,

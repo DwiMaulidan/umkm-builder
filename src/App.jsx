@@ -12,7 +12,10 @@ import Integrations from "./pages/Integrations";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-
+import {
+  AuthProvider,
+  useAuth,
+} from "./context/AuthContext";
 import { useState } from "react";
 
 import {
@@ -200,14 +203,33 @@ function MainApp() {
   );
 }
 
+function ProtectedRoute({ children }) {
+  const { isAuthenticated, authInitializing } = useAuth();
+
+  if (authInitializing) {
+    return (
+      <div className="auth-loading">
+        Memeriksa sesi pengguna...
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+}
+
 // ===============================
 // APP ROUTER / LOGIN REGISTER
 // ===============================
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
         <Route
           path="/"
           element={<LandingPage />}
@@ -225,7 +247,11 @@ function App() {
 
         <Route
           path="/app/*"
-          element={<MainApp />}
+          element={
+            <ProtectedRoute>
+              <MainApp />
+            </ProtectedRoute>
+          }
         />
 
         <Route
@@ -234,6 +260,7 @@ function App() {
         />
       </Routes>
     </BrowserRouter>
+    </AuthProvider>
   );
 }
 

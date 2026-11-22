@@ -1,4 +1,5 @@
-
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -11,9 +12,12 @@ export default function Login() {
   const [errors, setErrors] = useState({});
   const [form, setForm] = useState({ email: "", password: "" });
   const [message, setMessage] = useState("");
+  const navigate = useNavigate();
+  const { login, loading } = useAuth();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+
     const err = {};
 
     if (!form.email.trim()) {
@@ -29,8 +33,17 @@ export default function Login() {
     setErrors(err);
     setMessage("");
 
-    if (Object.keys(err).length === 0) {
-      setMessage("Form valid. Login akan tersedia setelah backend terhubung.");
+    if (Object.keys(err).length > 0) return;
+
+    try {
+      await login({
+        email: form.email.trim(),
+        password: form.password,
+      });
+
+      navigate("/app", { replace: true });
+    } catch (error) {
+      setMessage(error.message);
     }
   };
 
@@ -160,8 +173,13 @@ export default function Login() {
                 </div>
               )}
 
-              <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#0f8178] py-3.5 text-sm font-bold text-white hover:bg-teal-800">
-                Masuk <ArrowRight size={17}/>
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#0f8178] py-3.5 text-sm font-bold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loading ? "Memproses..." : "Masuk"}
+                {!loading && <ArrowRight size={17}/>}
               </button>
             </form>
 

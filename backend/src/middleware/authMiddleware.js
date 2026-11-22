@@ -17,8 +17,8 @@ const authenticateToken = async (req, res, next) => {
 
     const result = await pool.query(
       `SELECT user_id, business_id, role
-       FROM business_members
-       WHERE user_id = $1 AND business_id = $2`,
+      FROM public.business_members
+      WHERE user_id = $1 AND business_id = $2`,
       [decoded.userId, decoded.businessId]
     );
 

@@ -1,6 +1,6 @@
-
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import {
   Store, User, Building2, Mail, LockKeyhole,
   Eye, EyeOff, ArrowRight, ShieldCheck, CheckCircle2
@@ -20,6 +20,9 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [message, setMessage] = useState("");
+
+  const navigate = useNavigate();
+  const { register, loading } = useAuth();
 
   const update = (e) => {
     const { name, value, checked, type } = e.target;
@@ -71,14 +74,25 @@ export default function Register() {
     return Object.keys(err).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!validate()) return;
 
-    setMessage(
-      "Data berhasil divalidasi. Pendaftaran akun akan aktif setelah backend terhubung."
-    );
+    setMessage("");
+
+    try {
+      await register({
+        name: form.ownerName.trim(),
+        business_name: form.businessName.trim(),
+        email: form.email.trim(),
+        password: form.password,
+      });
+
+      navigate("/app", { replace: true });
+    } catch (error) {
+      setMessage(error.message);
+    }
   };
 
   const inputClass = (field) =>
@@ -288,13 +302,18 @@ export default function Register() {
               </div>
 
               {message && (
-                <div className="rounded-lg border border-teal-100 bg-teal-50 p-3 text-sm text-teal-800">
+                <div className="rounded-lg border border-red-100 bg-red-50 p-3 text-sm text-red-700">
                   {message}
                 </div>
               )}
 
-              <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#0f8178] py-3.5 text-sm font-bold text-white hover:bg-teal-800">
-                Daftar Sekarang <ArrowRight size={17}/>
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#0f8178] py-3.5 text-sm font-bold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loading ? "Memproses..." : "Daftar Sekarang"}
+                {!loading && <ArrowRight size={17}/>}
               </button>
             </form>
 
